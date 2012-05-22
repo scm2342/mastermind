@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction, MonoLocalBinds, FlexibleInstances, UndecidableInstances, TemplateHaskell, OverloadedStrings #-}
+module Main where
 
 {-
    This is just a little messing around because I am bored... The code shows that...
@@ -20,6 +21,7 @@ import System.Directory
 import Data.FileEmbed
 import Language.Haskell.TH.Syntax
 import qualified Data.ByteString.Char8 as BS
+import Score
 
 
 class Pretty a where
@@ -75,8 +77,6 @@ instance Enum Guess where
     enumFromTo = genEnumFromTo
     enumFrom = genEnumFrom
     enumFromThenTo = undefined
-
-data Score = Score Int Int deriving (Eq, Show, Read)
 
 instance Pretty Score where
     pretty (Score a b) = "red: " ++ show a ++ " white: " ++ show b
@@ -146,7 +146,7 @@ expCache = read $ BS.unpack $(do
 secondGuess :: Score -> Guess
 secondGuess score = maybe (memoized score) id $ M.lookup score expCache
     where
-    memoized = memoizeFinite $ \score -> nextGuessNoErr $ reduceSolset initGuess score $ S.fromList enumAll
+    memoized = traceMemoize $ \score -> nextGuessNoErr $ reduceSolset initGuess score $ S.fromList enumAll
 trainAll = foldlM (\num score -> putStrLn ("training " ++ show num ++ " out of " ++ show llstAll) >> (secondGuess score `seq` return (succ num))) 1 lstAll >> return ()
     where lstAll = enumAll :: [Score]
           llstAll = length lstAll
