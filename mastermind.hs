@@ -92,6 +92,7 @@ getGuess = do
     where get = getChar >>= \r -> putStr " " >> (return $ read $ return $ toUpper r)
 
 initGuess = Guess R R B B
+-- ghci only - i pretty much messed up io code :)
 main1 = do
     guess $ initGuess
     score <- getScore
@@ -116,7 +117,6 @@ main2 = do
         if score' == Score 4 0 then putStrLn "Damn" else
             loop solution
 
--- ghci only - i pretty much messed up io code :)
 main3 = do
     solution <- randomIO
     guess initGuess
