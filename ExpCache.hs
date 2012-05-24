@@ -23,7 +23,7 @@ expCache = $(do
 
     fileThere <- runIO $ doesFileExist filename
     str <- runIO $ if fileThere then readFile filename >>= checkStr else do
-        putStrLn $ "No \"" ++ filename ++ "\" file found - compiling withoug ExpCache\nRun with \"-writemap\" to generate \"" ++ filename ++ "\" and recompile"
+        putStrLn $ "No \"" ++ filename ++ "\" file found - compiling without ExpCache\nRun with \"-writemap\" to generate \"" ++ filename ++ "\" and recompile"
         return emptyStr
     reader <- [| read |]
     return $ AppE reader $ LitE $ StringL str
