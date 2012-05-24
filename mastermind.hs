@@ -1,4 +1,3 @@
-{-# LANGUAGE NoMonomorphismRestriction, MonoLocalBinds, FlexibleInstances, UndecidableInstances, TemplateHaskell, OverloadedStrings #-}
 module Main where
 
 {-
@@ -12,116 +11,16 @@ import qualified Data.Map as M
 import Data.Foldable
 import Data.List (sort)
 import System.Random
-import Control.Monad.State
 import Data.Char
 import Data.Function.Memoize
 import System.Environment
 import System.IO
+import Control.DeepSeq
+import Control.Monad
 import System.Directory
-import Data.FileEmbed
-import Language.Haskell.TH.Syntax
-import qualified Data.ByteString.Char8 as BS
+import Types
 import Score
-
-
-class Pretty a where
-    pretty :: a -> String
-
-data Color = R | B | Y | W | G | P deriving (Eq, Show, Enum, Bounded, Ord, Read)
-
-instance Pretty Color where
-    pretty = show
-
-instance Random Color where
-    randomR (lo, hi) g = let (i, g') = randomR (fromEnum lo, fromEnum hi) g in (toEnum i, g')
-    random g = randomR (minBound, maxBound) g
-
-data Guess = Guess Color Color Color Color deriving (Eq, Show, Read)
-
-instance Pretty Guess where
-    pretty (Guess a b c d) = pretty a ++ " " ++ pretty b ++ " " ++ pretty c ++ " " ++ pretty d
-
-instance Random Guess where
-    -- sloooow not used anyhow
-    randomR (lo, hi) g = let (i, g') = randomR (fromEnum lo, fromEnum hi) g in (toEnum i, g')
-    random = runState $ do
-        a <- getR
-        b <- getR
-        c <- getR
-        d <- getR
-        return $ Guess a b c d
-        where getR = get >>= \g -> let (r, g') = random g in put g' >> return r
-
-instance Ord Guess where
-    compare (Guess a1 b1 c1 d1) (Guess a2 b2 c2 d2) = compare [a1, b1, c1, d1] [a2, b2, c2, d2]
-
-instance Bounded Guess where
-    minBound = Guess R R R R
-    maxBound = Guess P P P P
-
-instance Enum Guess where
-    succ (Guess a b c d)
-        | d < maxBound = Guess a b c (succ d)
-        | c < maxBound = Guess a b (succ c) minBound
-        | b < maxBound = Guess a (succ b) minBound minBound
-        | a < maxBound = Guess (succ a) minBound minBound minBound
-        | otherwise = error "out of bounds succ"
-    pred (Guess a b c d)
-        | d > minBound = Guess a b c (pred d)
-        | c > minBound = Guess a b (pred c) maxBound
-        | b > minBound = Guess a (pred b) maxBound maxBound
-        | a > minBound = Guess (pred a) maxBound maxBound maxBound
-        | otherwise = error "out of bounds pred"
-    toEnum = genToEnum
-    fromEnum = genFromEnum
-    enumFromTo = genEnumFromTo
-    enumFrom = genEnumFrom
-    enumFromThenTo = undefined
-
-instance Pretty Score where
-    pretty (Score a b) = "red: " ++ show a ++ " white: " ++ show b
-
-instance Ord Score where
-    compare (Score a1 b1) (Score a2 b2)
-        | cmp == EQ = compare a1 a2
-        | otherwise = cmp
-      where
-      cmp = compare (a1 + b1) (a2 + b2)
-
-instance Bounded Score where
-    minBound = Score 0 0
-    maxBound = Score 4 0
-
-instance Enum Score where
-    succ (Score a b)
-        | a < 4 && b > 0 = Score (succ a) (pred b)
-        | b == 0 && a + b < 4 = Score 0 (succ (a + b))
-        | otherwise = error "out of bound succ"
-    pred (Score a b)
-        | a > 0 && b < 4 = Score (pred a) (succ b)
-        | a == 0 && a + b > 0 = Score (pred (a + b)) 0
-        | otherwise = error "out of bound pred"
-    toEnum = genToEnum
-    fromEnum = genFromEnum
-    enumFromTo = genEnumFromTo
-    enumFrom = genEnumFrom
-    enumFromThenTo = undefined
-
--- general enum funs. the default stuff seems worse since it does not
--- depend on Bounded and Ord instance
-genToEnum x = helper minBound x
-    where
-    helper acc 0 = acc
-    helper acc x = helper (succ acc) (pred x)
-genFromEnum x = helper 0 x
-    where
-    helper acc x
-        | x == minBound = acc
-        | otherwise     = helper (succ acc) (pred x)
-genEnumFromTo x y | x < y = x : enumFromTo (succ x) y
-               | otherwise = [y]
-genEnumFrom x = enumFromTo x maxBound
-enumAll = enumFrom minBound
+import ExpCache
 
 score (Guess s1 s2 s3 s4) (Guess g1 g2 g3 g4) = Score correct (color - correct)
     where
@@ -139,14 +38,10 @@ score (Guess s1 s2 s3 s4) (Guess g1 g2 g3 g4) = Score correct (color - correct)
 valid guess score' solution = score guess solution == score'
 invalid guess score' solution = not $ valid guess score' solution
 
-expCache = read $ BS.unpack $(do
-    fileThere <- runIO $ doesFileExist "map"
-    if not fileThere then return $! LitE $! StringL $! "fromList []" else
-        embedFile "map")
 secondGuess :: Score -> Guess
 secondGuess score = maybe (memoized score) id $ M.lookup score expCache
     where
-    memoized = traceMemoize $ \score -> nextGuessNoErr $ reduceSolset initGuess score $ S.fromList enumAll
+    memoized = let res = memoize $ \score -> nextGuessNoErr $ reduceSolset initGuess score $ S.fromList enumAll in res `deepseq` res
 trainAll = foldlM (\num score -> putStrLn ("training " ++ show num ++ " out of " ++ show llstAll) >> (secondGuess score `seq` return (succ num))) 1 lstAll >> return ()
     where lstAll = enumAll :: [Score]
           llstAll = length lstAll
@@ -156,7 +51,7 @@ writeMap = do
     when (fileThere) $ putStrLn "Warning - will override file \"map\". Press any key to continue" >> getChar >> return ()
     withFile "map" WriteMode $ \fh -> do
         let map = foldl' (\map score -> M.insert score (secondGuess score) map) M.empty enumAll
-        hPrint fh map
+        hPutStr fh $ show map
 
 
 nextGuess solset
