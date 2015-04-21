@@ -224,4 +224,6 @@ main = do
     args <- getArgs
     when (any (== "-trainall") args) $ trainAll
     if any (== "-writemap") args then writeMap else
-        HL.runInputT HL.defaultSettings main4HL
+        HL.runInputT HL.defaultSettings $
+          if any (== "-challenge") args then main4HL else
+          if any (== "-player") args then main1HL else main2HL
