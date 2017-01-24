@@ -1,1 +1,8 @@
 I was very bored. However, within the code there is a little bit of magic going on with memoizing and caching. Nothing fancy tough - all library stuff.
+
+To get fast version, compile as follows:
+
+stack build
+run with -writemap and workdir set to root of project (shoule generate map file)
+stack clean
+stack build

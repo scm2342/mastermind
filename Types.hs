@@ -1,10 +1,12 @@
-{-# LANGUAGE NoMonomorphismRestriction, MonoLocalBinds, FlexibleInstances, UndecidableInstances#-}
+{-# LANGUAGE NoMonomorphismRestriction, MonoLocalBinds, FlexibleInstances, UndecidableInstances, DeriveGeneric #-}
 module Types where
 
 import Score
 import Control.DeepSeq
 import System.Random
 import Control.Monad.State
+import GHC.Generics
+
 
 class Pretty a where
     pretty :: a -> String
@@ -41,7 +43,7 @@ instance Enum Score where
     enumFrom = genEnumFrom
     enumFromThenTo = undefined
 
-data Color = R | B | Y | W | G | P deriving (Eq, Show, Enum, Bounded, Ord, Read)
+data Color = R | B | Y | W | G | P deriving (Eq, Show, Enum, Bounded, Ord, Read, Generic)
 
 instance NFData Color
 
